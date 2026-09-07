@@ -5,7 +5,7 @@
 #   git add . && git commit -m "init" && git push
 set -e
 echo "Đang giải nén project..."
-base64 -d project.b64 > project.tar.gz
+base64 -d project_b64.txt > project.tar.gz
 tar xzf project.tar.gz
 rm project.tar.gz
 echo "Xong! Xem thư mục FamilyConnect-android/ và dashboard/"
