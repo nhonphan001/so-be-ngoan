@@ -3,7 +3,7 @@
 // nên có thể chuyển mượt từ biểu cảm này sang biểu cảm khác.
 import * as THREE from 'three';
 
-const INK = '#1c2a80';
+const INK = '#1b2350';
 const SIZE = 512;
 
 export const FACE_DEFAULT = {
@@ -143,14 +143,14 @@ export class Face {
     c.fillStyle = '#ffffff';
     c.fillRect(cx - 60, cy - 70, 120, 140);
     const g = c.createLinearGradient(0, cy - ry, 0, cy + ry);
-    g.addColorStop(0, '#131c5e');
-    g.addColorStop(0.45, '#2f4fd6');
-    g.addColorStop(1, '#9fd4ff');
+    g.addColorStop(0, '#27304f');
+    g.addColorStop(0.45, '#5b74a8');
+    g.addColorStop(1, '#bfd2ee');
     c.fillStyle = g;
     c.beginPath();
     c.ellipse(cx, cy + 2, rx * 0.86, ry * 0.92, 0, 0, Math.PI * 2);
     c.fill();
-    c.fillStyle = '#0b1140';
+    c.fillStyle = '#141a36';
     c.beginPath();
     c.ellipse(cx, cy, rx * 0.4, ry * 0.46, 0, 0, Math.PI * 2);
     c.fill();
