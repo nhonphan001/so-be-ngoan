@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { Face } from './face.js';
 
 export const PALETTE = {
-  ink: 0x1b2350,
+  ink: 0x2434b4,
   skin: 0xffeee2,
   hair: 0xe1e8f5,
   streak: 0x4f86cf,
@@ -17,13 +17,72 @@ export const PALETTE = {
   gold: 0xf0c44a,
 };
 
-const outlineMat = new THREE.MeshBasicMaterial({ color: PALETTE.ink, side: THREE.BackSide });
-const toon = (color, extra = {}) => new THREE.MeshToonMaterial({ color, ...extra });
+// ---------------------------------------------------------------- Phong cách bút bi
+// Mọi vật liệu dùng chung một đoạn shader: khi uSketch = 1, màu tô được thay bằng
+// nền giấy + nét gạch mực xanh (gạch thưa, gạch chéo, hoặc tô mực loang tuỳ độ đậm).
+export const sketch = {
+  uSketch: { value: 1 },
+  uPaper: { value: new THREE.Color(0xf3eedb) },
+  uInkCol: { value: new THREE.Color(0x2434b4) },
+  uLight: { value: new THREE.Vector3(0.4, 0.7, 0.6) },
+  uAnchor: { value: new THREE.Vector2() },
+  uBoil: { value: 0 },
+  uPx: { value: 1 },
+};
+const SKETCH_GLSL = `
+uniform float uSketch; uniform vec3 uPaper; uniform vec3 uInkCol; uniform vec3 uLight;
+uniform vec2 uAnchor; uniform float uBoil; uniform float uPx; uniform float uInk; uniform float uAng;
+float skHash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+float skNoise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+  return mix(mix(skHash(i),skHash(i+vec2(1,0)),f.x), mix(skHash(i+vec2(0,1)),skHash(i+vec2(1,1)),f.x), f.y); }
+float skHatch(vec2 p, float ang, float sp, float th){
+  vec2 d=vec2(cos(ang),sin(ang)); float along=dot(p,d);
+  float t=dot(p,vec2(-d.y,d.x)) + sin(along*0.07+ang*9.+uBoil)*1.3 + (skNoise(p*0.08+uBoil)-0.5)*2.5;
+  float f=abs(fract(t/sp)-0.5)*sp;
+  float gaps=smoothstep(0.12,0.3, skNoise(vec2(along*0.03, floor(t/sp)*3.7+uBoil)));
+  return (1.-smoothstep(th,th+0.9,f))*gaps; }
+`;
+const SKETCH_MAIN = `
+if (uSketch > 0.5) {
+  vec2 skp = (gl_FragCoord.xy - uAnchor) / uPx;
+  float baseLum = dot(diffuseColor.rgb, vec3(0.2126,0.7152,0.0722));
+  float tone = uInk < -0.5 ? (1.0 - smoothstep(0.0,0.8,baseLum))*0.85 : uInk;
+  float ndl = dot(normalize(normal), uLight);
+  float dark = tone + (1.0 - smoothstep(-0.15,0.4,ndl))*0.3;
+  float a = skHatch(skp,uAng,6.5,0.55)*smoothstep(0.1,0.2,dark);
+  a = max(a, skHatch(skp,uAng+1.2,7.5,0.55)*smoothstep(0.42,0.52,dark));
+  float fill = smoothstep(0.64,0.74,dark)*(0.5+0.35*skNoise(skp*0.12));
+  a = max(a*0.9, fill);
+  gl_FragColor.rgb = mix(uPaper, uInkCol, a);
+}
+`;
+function sketchPatch(shader) {
+  Object.assign(shader.uniforms, sketch, { uInk: { value: this.userData.ink ?? -1 }, uAng: { value: this.userData.ang ?? 0.8 } });
+  shader.fragmentShader = SKETCH_GLSL + shader.fragmentShader.replace('#include <tonemapping_fragment>', SKETCH_MAIN + '#include <tonemapping_fragment>');
+}
+// ink: độ đậm mực 0..1 (-1 = tự suy từ màu), ang: hướng nét gạch
+export const toon = (color, extra = {}, ink = -1, ang = 0.8) => {
+  const m = new THREE.MeshToonMaterial({ color, ...extra });
+  m.userData = { ink, ang };
+  m.onBeforeCompile = sketchPatch;
+  return m;
+};
+// Nét viền: vỏ ngược, rung nhẹ như nét tay khi ở chế độ bút bi
+export const outlineMat = new THREE.MeshBasicMaterial({ color: 0x2434b4, side: THREE.BackSide });
+outlineMat.onBeforeCompile = (shader) => {
+  shader.uniforms.uSketch = sketch.uSketch;
+  shader.uniforms.uBoil = sketch.uBoil;
+  shader.vertexShader = 'uniform float uSketch; uniform float uBoil;\n' + shader.vertexShader.replace('#include <begin_vertex>',
+    '#include <begin_vertex>\n transformed += normal * (sin(position.x*31.+uBoil*5.)+sin(position.y*27.+uBoil*3.)+sin(position.z*35.+uBoil))*0.0035*uSketch;');
+};
+export function setSketch(on) {
+  sketch.uSketch.value = on ? 1 : 0;
+  outlineMat.color.set(on ? 0x2434b4 : 0x1b2350);
+}
 
 // Tạo mesh kèm lớp viền (vỏ ngược phóng to một chút)
 function part(geo, mat, w = 0.013) {
   const m = new THREE.Mesh(geo, mat);
-  m.castShadow = true;
   if (w > 0) {
     geo.computeBoundingSphere();
     const { radius, center } = geo.boundingSphere;
@@ -115,7 +174,6 @@ function strand(points, r, mat, w = 0.012) {
   const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)));
   const g = new THREE.Group();
   const m = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, r, 10), mat);
-  m.castShadow = true;
   g.add(m, new THREE.Mesh(new THREE.TubeGeometry(curve, 28, r + w, 10), outlineMat));
   for (const p of [points[0], points[points.length - 1]]) {
     const cap = part(new THREE.SphereGeometry(r, 10, 8), mat, w);
@@ -159,19 +217,19 @@ const lathe = (pts, seg = 44) => new THREE.LatheGeometry(pts.map(([r, y]) => new
 
 export function createCharacter() {
   const mats = {
-    skin: toon(PALETTE.skin),
-    hair: toon(PALETTE.hair, { side: THREE.DoubleSide }),
-    hairBlue: toon(PALETTE.streak, { side: THREE.DoubleSide }),
+    skin: toon(PALETTE.skin, {}, -0.2), // da để trống giấy, không gạch bóng
+    hair: toon(PALETTE.hair, { side: THREE.DoubleSide }, 0.3, 1.45),
+    hairBlue: toon(PALETTE.streak, { side: THREE.DoubleSide }, 0.5, 1.45),
     dress: toon(PALETTE.white, { side: THREE.DoubleSide }),
     white: toon(PALETTE.white),
-    bodice: toon(PALETTE.bodice),
-    band: toon(PALETTE.pale),
-    gold: toon(PALETTE.gold),
-    bow: toon(PALETTE.bow),
-    bowLight: toon(0x9fc0ea),
+    bodice: toon(PALETTE.bodice, {}, 0.45),
+    band: toon(PALETTE.pale, {}, 0.15),
+    gold: toon(PALETTE.gold, {}, 0.9),
+    bow: toon(PALETTE.bow, {}, 0.14, 0.3),
+    bowLight: toon(0x9fc0ea, {}, 0.45, 0.3),
     silver: toon(0xeef2fa, { side: THREE.DoubleSide }),
-    leaf: toon(0x5fa35a),
-    rose: toon(PALETTE.rose),
+    leaf: toon(0x5fa35a, {}, 0.45),
+    rose: toon(PALETTE.rose, {}, 0.8),
     roseDark: new THREE.MeshBasicMaterial({ color: PALETTE.roseDark }),
     checker: toon(0xffffff, { map: checkerTexture(22, 2), side: THREE.DoubleSide }),
     ribbon: toon(0xffffff, { map: checkerTexture(2, 7), side: THREE.DoubleSide }),
@@ -454,9 +512,9 @@ export function createCharacter() {
 export function createCompanion() {
   const mats = {
     white: toon(0xffffff),
-    rose: toon(PALETTE.rose),
+    rose: toon(PALETTE.rose, {}, 0.8),
     roseDark: new THREE.MeshBasicMaterial({ color: PALETTE.roseDark }),
-    pale: toon(PALETTE.pale),
+    pale: toon(PALETTE.pale, {}, 0.3),
     ink: new THREE.MeshBasicMaterial({ color: PALETTE.ink }),
   };
   const g = new THREE.Group();

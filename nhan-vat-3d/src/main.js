@@ -1,16 +1,14 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
-import { createCharacter, createCompanion, makeRose, PALETTE } from './character.js';
+import { createCharacter, createCompanion, makeRose, PALETTE, toon, outlineMat, sketch, setSketch } from './character.js';
 
 // ---------------------------------------------------------------- Cảnh
 const canvas = document.getElementById('scene');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-const SKY = 0xe6edff;
+const SKY = 0xf3eedb; // màu giấy vở
 scene.background = new THREE.Color(SKY);
 scene.fog = new THREE.Fog(SKY, 16, 42);
 
@@ -26,56 +24,102 @@ controls.maxPolarAngle = Math.PI * 0.49;
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0xcfd6f5, 1.5));
 const sun = new THREE.DirectionalLight(0xffffff, 2.0);
-sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
-Object.assign(sun.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 0.5, far: 30 });
-sun.shadow.bias = -0.002;
 scene.add(sun, sun.target);
 const SUN_OFFSET = new THREE.Vector3(4, 9, 6);
 
-// Mặt đất: giấy vở màu kem + tấm thảm caro
+// Mặt đất là trang giấy: dải caro tô bút bi vắt chéo và vài hình vẽ nguệch ngoạc
 function groundTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 1024;
+  const S = 2048, c = document.createElement('canvas');
+  c.width = c.height = S;
   const g = c.getContext('2d');
-  g.fillStyle = '#f7f2e1';
-  g.fillRect(0, 0, 1024, 1024);
-  g.save();
-  g.beginPath(); g.arc(512, 512, 250, 0, Math.PI * 2); g.clip();
-  const n = 16, s = 500 / n;
-  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
-    g.fillStyle = (i + j) % 2 ? '#dfe7ff' : '#ffffff';
-    g.fillRect(262 + i * s, 262 + j * s, s + 1, s + 1);
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  g.fillStyle = '#f3eedb';
+  g.fillRect(0, 0, S, S);
+  g.strokeStyle = '#2434b4';
+  g.lineCap = 'round';
+  const line = (x1, y1, x2, y2, w = 2.2) => { // nét tay hơi run
+    g.lineWidth = w;
+    g.beginPath();
+    g.moveTo(x1 + rnd() * 3 - 1.5, y1 + rnd() * 3 - 1.5);
+    g.quadraticCurveTo((x1 + x2) / 2 + rnd() * 6 - 3, (y1 + y2) / 2 + rnd() * 6 - 3, x2 + rnd() * 3 - 1.5, y2 + rnd() * 3 - 1.5);
+    g.stroke();
+  };
+  const ribbon = (cx, cy, ang, len) => {
+    g.save();
+    g.translate(cx, cy);
+    g.rotate(ang);
+    const cell = 46;
+    for (let i = -len; i < len; i++) for (let j = 0; j < 2; j++) {
+      const x = i * cell, y = (j - 1) * cell;
+      if ((i + j) % 2 === 0) for (let k = 4; k < cell * 2; k += 8) { // tô ô bằng nét gạch
+        const a = Math.max(0, k - cell), b = Math.min(k, cell);
+        line(x + a, y + (k - a), x + b, y + (k - b), 2.6);
+      }
+    }
+    line(-len * cell, -cell, len * cell, -cell, 3);
+    line(-len * cell, cell, len * cell, cell, 3);
+    g.restore();
+  };
+  ribbon(1024, 760, -0.42, 26);
+  ribbon(1300, 1024, 1.05, 26);
+  for (let i = 0; i < 46; i++) { // mây xoắn, tim, hoa nhỏ
+    const x = rnd() * S, y = rnd() * S, r = 16 + rnd() * 18, kind = i % 3;
+    g.lineWidth = 2.4;
+    g.beginPath();
+    if (kind === 0) {
+      for (let t = 0; t < 9; t += 0.25) g.lineTo(x + Math.cos(t) * t * r * 0.11, y + Math.sin(t) * t * r * 0.11);
+      for (let k = 0; k < 4; k++) g.arc(x + (k - 1.5) * r * 0.6, y + r * 0.9, r * 0.38, Math.PI, 0);
+    } else if (kind === 1) {
+      g.moveTo(x, y + r * 0.6);
+      g.bezierCurveTo(x - r * 1.3, y - r * 0.3, x - r * 0.5, y - r, x, y - r * 0.3);
+      g.bezierCurveTo(x + r * 0.5, y - r, x + r * 1.3, y - r * 0.3, x, y + r * 0.6);
+    } else {
+      for (let k = 0; k < 5; k++) { const a = k * 1.2566; g.moveTo(x + Math.cos(a) * r * 0.85, y + Math.sin(a) * r * 0.5 + r * 0.01); g.arc(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5, r * 0.36, 0, Math.PI * 2); }
+    }
+    g.stroke();
   }
-  g.restore();
-  g.strokeStyle = '#1c2a80';
-  g.lineWidth = 5;
-  g.beginPath(); g.arc(512, 512, 250, 0, Math.PI * 2); g.stroke();
-  g.setLineDash([10, 14]);
-  g.lineWidth = 3;
-  g.beginPath(); g.arc(512, 512, 272, 0, Math.PI * 2); g.stroke();
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
 }
 const WORLD_R = 13;
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(32, 32),
-  new THREE.MeshToonMaterial({ map: groundTexture() }));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(34, 34), new THREE.MeshBasicMaterial({ map: groundTexture() }));
 ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
 scene.add(ground);
-const farGround = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshBasicMaterial({ color: 0xf7f2e1 }));
+const farGround = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshBasicMaterial({ color: SKY }));
 farGround.rotation.x = -Math.PI / 2;
 farGround.position.y = -0.01;
 scene.add(farGround);
 
+// Bóng dưới chân: vài nét gạch bút bi
+function shadowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.beginPath(); g.ellipse(128, 128, 120, 120, 0, 0, Math.PI * 2); g.clip();
+  g.strokeStyle = 'rgba(36,52,180,0.8)';
+  g.lineWidth = 3;
+  g.lineCap = 'round';
+  for (let k = -256; k < 256; k += 11) {
+    g.beginPath();
+    g.moveTo(k + Math.sin(k) * 4, 0);
+    g.lineTo(k + 256 + Math.cos(k) * 4, 256);
+    g.stroke();
+  }
+  return new THREE.CanvasTexture(c);
+}
+const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 1.7), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false }));
+blob.rotation.x = -Math.PI / 2;
+blob.position.y = 0.012;
+scene.add(blob);
+
 // Trang trí: hoa hồng xanh và mây như các nét vẽ nguệch ngoạc trong tranh
 const decoMats = {
-  rose: new THREE.MeshToonMaterial({ color: PALETTE.rose }),
+  rose: toon(PALETTE.rose, {}, 0.8),
   roseDark: new THREE.MeshBasicMaterial({ color: PALETTE.roseDark }),
-  white: new THREE.MeshToonMaterial({ color: 0xffffff }),
+  white: toon(0xffffff),
 };
 const clouds = [];
 for (let i = 0; i < 14; i++) {
@@ -90,7 +134,7 @@ for (let i = 0; i < 9; i++) {
   const cloud = new THREE.Group();
   for (const [x, y, s] of [[0, 0, 0.5], [0.5, -0.05, 0.38], [-0.5, -0.05, 0.4], [0.2, 0.25, 0.36], [-0.25, 0.2, 0.3]]) {
     const puff = new THREE.Mesh(new THREE.SphereGeometry(s, 12, 10), decoMats.white);
-    const o = new THREE.Mesh(puff.geometry, new THREE.MeshBasicMaterial({ color: PALETTE.ink, side: THREE.BackSide }));
+    const o = new THREE.Mesh(puff.geometry, outlineMat);
     o.scale.setScalar(1 + 0.03 / s);
     puff.add(o);
     puff.position.set(x, y, 0);
@@ -327,6 +371,16 @@ const stickEnd = (e) => { if (e.pointerId !== stickId) return; stickId = null; j
 stick.addEventListener('pointerup', stickEnd);
 stick.addEventListener('pointercancel', stickEnd);
 
+// Chuyển giữa nét bút bi và tô màu
+const styleBtn = document.getElementById('styleBtn');
+function applyStyle(on) {
+  setSketch(on);
+  ch.face.sketch = on;
+  document.body.classList.toggle('color-mode', !on);
+  styleBtn.textContent = on ? '🎨 Tô màu' : '🖊️ Bút bi';
+}
+styleBtn.addEventListener('click', () => applyStyle(sketch.uSketch.value < 0.5));
+
 // Đổi màu tóc / váy
 document.getElementById('hairColor').addEventListener('input', (e) => ch.mats.hair.color.set(e.target.value));
 document.getElementById('dressColor').addEventListener('input', (e) => ch.mats.dress.color.set(e.target.value));
@@ -460,6 +514,15 @@ function update(dt, t) {
   controls.update();
   sun.position.copy(state.pos).add(SUN_OFFSET);
   sun.target.position.copy(state.pos);
+  blob.position.x = state.pos.x; blob.position.z = state.pos.z;
+  blob.scale.setScalar(Math.max(0.45, 1 - state.y * 0.4));
+
+  // tham số cho nét bút bi: hướng sáng, điểm neo nét gạch, độ "run" của nét (8 hình/giây)
+  sketch.uPx.value = renderer.getPixelRatio();
+  sketch.uLight.value.copy(SUN_OFFSET).normalize().transformDirection(camera.matrixWorldInverse);
+  tmp.set(state.pos.x, 0.9, state.pos.z).project(camera);
+  sketch.uAnchor.value.set((tmp.x * 0.5 + 0.5) * canvas.width, (tmp.y * 0.5 + 0.5) * canvas.height);
+  sketch.uBoil.value = Math.floor(t * 8) * 1.7;
 
   for (const c of clouds) {
     c.position.y += Math.sin(t * 0.5 + c.userData.a * 3) * 0.002;

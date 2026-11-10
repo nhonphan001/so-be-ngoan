@@ -1,6 +1,6 @@
 # Queen of White 3D
 
-Webapp dựng nhân vật 3D từ bức tranh bút bi "Queen of White" (cô bé nơ trắng, hoa hồng xanh, váy caro và bạn thú bông), với các chuyển động cơ bản của nhân vật game.
+Webapp dựng nhân vật 3D từ bức tranh bút bi "Queen of White" (cô bé thắt nơ, hoa hồng xanh, váy caro và bạn thú bông), hiển thị theo nét bút bi trên giấy vở: mực xanh, tô bóng bằng nét gạch, nét viền run tay. Nút "Tô màu" chuyển sang bản màu, với các chuyển động cơ bản của nhân vật game.
 
 ## Chuyển động
 
