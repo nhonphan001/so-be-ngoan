@@ -79,7 +79,8 @@ button:focus-visible, input:focus-visible { outline: 3px solid #ffb400; outline-
   user-select: text; -webkit-user-select: text;
 }
 #sayForm button { padding: 0 20px; background: var(--ink); color: var(--paper); box-shadow: 0 3px 0 #141d6e; font-size: 18px; }
-#styleBtn { padding: 5px 12px; font-size: 16px; }
+.modes { display: flex; gap: 6px; }
+.modes button { padding: 5px 10px; font-size: 15px; white-space: nowrap; }
 .pick { display: none !important; }
 .color-mode .pick { display: flex !important; }
 
@@ -100,7 +101,9 @@ button:focus-visible, input:focus-visible { outline: 3px solid #ffb400; outline-
 @media (max-width: 640px) {
   .actions { grid-template-columns: repeat(5, 1fr); }
   .hint { max-width: 55vw; font-size: 12px; }
-  .colors { flex-direction: column; align-items: flex-end; gap: 4px; }
+  .colors { flex-direction: column; align-items: flex-end; gap: 6px; }
+  .modes { flex-direction: column; align-items: stretch; }
+  .modes button { padding: 3px 8px; font-size: 14px; }
 }
 
 /* Gáy lò xo của cuốn sổ */

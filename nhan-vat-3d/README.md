@@ -2,6 +2,13 @@
 
 Webapp dựng nhân vật 3D từ bức tranh bút bi "Queen of White" (cô bé thắt nơ, hoa hồng xanh, váy caro và bạn thú bông), hiển thị theo nét bút bi trên giấy vở: mực xanh, tô bóng bằng nét gạch, nét viền run tay. Nút "Tô màu" chuyển sang bản màu, với các chuyển động cơ bản của nhân vật game.
 
+## Ba kiểu hiển thị
+
+-  – con rối giấy từ các lớp cắt của bản vẽ gốc
+- **Nét vẽ gốc** (mặc định): nhân vật là hình cắt giấy từ chính nét vẽ tay (3 lớp thân, đầu, thú bông trong ), biểu cảm được vẽ đè bằng nét mực.
+- **3D bút bi**: mô hình 3D hiển thị bằng nét gạch mực xanh trên giấy.
+- **3D tô màu**: mô hình 3D tô màu.
+
 ## Chuyển động
 
 | Nút | Phím | Mô tả |

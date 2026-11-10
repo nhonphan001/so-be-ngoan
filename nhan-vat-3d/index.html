@@ -20,7 +20,11 @@
 
   <div class="binding"></div>
   <div class="colors">
-    <button id="styleBtn" type="button">🎨 Tô màu</button>
+    <div class="modes">
+      <button type="button" data-mode="doll">✏️ Nét vẽ gốc</button>
+      <button type="button" data-mode="sketch">🖊️ 3D bút bi</button>
+      <button type="button" data-mode="color">🎨 3D tô màu</button>
+    </div>
     <label class="pick" title="Màu tóc">Tóc <input type="color" id="hairColor" value="#e1e8f5"></label>
     <label class="pick" title="Màu váy">Váy <input type="color" id="dressColor" value="#ffffff"></label>
     <label title="Bật giọng đọc"><input type="checkbox" id="sound" checked> Tiếng</label>

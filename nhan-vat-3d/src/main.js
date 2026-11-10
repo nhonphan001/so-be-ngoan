@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/OrbitControls.js';
+import { createDoll } from './doll.js';
 import { createCharacter, createCompanion, makeRose, PALETTE, toon, outlineMat, sketch, setSketch } from './character.js';
 
 // ---------------------------------------------------------------- Cảnh
@@ -154,6 +155,16 @@ scene.add(ch.root);
 const pal = createCompanion();
 pal.position.set(0.9, 1.3, -0.5);
 scene.add(pal);
+
+// Con rối giấy từ nét vẽ gốc
+const doll = createDoll();
+scene.add(doll.root, doll.bunny);
+const dollAnger = ch.anger.clone();
+dollAnger.material = ch.anger.material.clone();
+dollAnger.position.set(0.3, 0.6, 0.05);
+dollAnger.renderOrder = 5;
+doll.head.add(dollAnger);
+let mode = 'doll'; // 'doll' | 'sketch' | 'color'
 
 const state = {
   pos: new THREE.Vector3(),
@@ -371,15 +382,20 @@ const stickEnd = (e) => { if (e.pointerId !== stickId) return; stickId = null; j
 stick.addEventListener('pointerup', stickEnd);
 stick.addEventListener('pointercancel', stickEnd);
 
-// Chuyển giữa nét bút bi và tô màu
-const styleBtn = document.getElementById('styleBtn');
-function applyStyle(on) {
-  setSketch(on);
-  ch.face.sketch = on;
-  document.body.classList.toggle('color-mode', !on);
-  styleBtn.textContent = on ? '🎨 Tô màu' : '🖊️ Bút bi';
+// Ba kiểu hiển thị: nét vẽ gốc (cắt giấy), 3D bút bi, 3D tô màu
+const modeBtns = [...document.querySelectorAll('[data-mode]')];
+function applyMode(m) {
+  mode = m;
+  const is3d = m !== 'doll';
+  ch.root.visible = pal.visible = is3d;
+  doll.root.visible = doll.bunny.visible = !is3d;
+  setSketch(m !== 'color');
+  ch.face.sketch = m !== 'color';
+  document.body.classList.toggle('color-mode', m === 'color');
+  for (const b of modeBtns) b.classList.toggle('active', b.dataset.mode === m);
 }
-styleBtn.addEventListener('click', () => applyStyle(sketch.uSketch.value < 0.5));
+modeBtns.forEach((b) => b.addEventListener('click', () => applyMode(b.dataset.mode)));
+applyMode('doll');
 
 // Đổi màu tóc / váy
 document.getElementById('hairColor').addEventListener('input', (e) => ch.mats.hair.color.set(e.target.value));
@@ -507,6 +523,41 @@ function update(dt, t) {
   pal.rotation.y = angleLerp(pal.rotation.y, state.heading - 0.35, pk);
   pal.rotation.z = Math.sin(t * 1.7) * 0.08 + (action === 'angry' ? Math.sin(t * 30) * 0.04 : 0);
   pal.rotation.x = action === 'cry' ? 0.3 : 0;
+
+  // --- Con rối giấy: cùng trạng thái, cử động kiểu cắt giấy
+  if (mode === 'doll') {
+    const sn = Math.sin, moving = Math.min(1, state.speed / WALK), run = action === 'run' ? 1 : 0;
+    doll.root.position.set(state.pos.x + shake, state.y + pose.hipY * 1.5, state.pos.z);
+    doll.root.rotation.y = Math.atan2(camera.position.x - state.pos.x, camera.position.z - state.pos.z);
+    if (state.speed > 0.2) { // lật theo hướng đi trên màn hình
+      camera.getWorldDirection(fwd);
+      const side = Math.sin(state.heading) * -fwd.z + Math.cos(state.heading) * fwd.x;
+      if (Math.abs(side) > 0.25) state.flip = side > 0 ? 1 : -1;
+    }
+    doll.flip.scale.x += ((state.flip || 1) - doll.flip.scale.x) * (1 - Math.exp(-dt * 14));
+    let bz = sn(state.phase) * 0.07 * moving - run * 0.1 + sn(t * 1.6) * 0.012, hz = sn(state.phase - 0.7) * 0.08 * moving + sn(t * 0.9) * 0.03;
+    let wave = 0;
+    if (action === 'jump') { bz = state.vy * 0.012; hz = -state.vy * 0.02; }
+    if (action === 'talk') hz = sn(t * 5) * 0.06;
+    if (action === 'laugh') { bz = sn(t * 11) * 0.03; hz = -0.12 + sn(t * 11) * 0.05; }
+    if (action === 'wave') { bz = -0.06 + sn(t * 5) * 0.03; hz = 0.12; wave = 1; }
+    if (action === 'cry') { bz = sn(t * 17) * 0.012; hz = 0.14 + sn(t * 8) * 0.02; }
+    if (action === 'angry') { bz = sn(t * 40) * 0.02; hz = -0.06 + sn(t * 30) * 0.02; }
+    const dk = 1 - Math.exp(-dt * 14);
+    doll.body.rotation.z += (bz - doll.body.rotation.z) * dk;
+    doll.head.rotation.z += (hz - doll.head.rotation.z) * dk;
+    const breathe = 1 + sn(t * 2) * 0.012;
+    doll.body.scale.set(1 - squash * 0.6, (1 + squash) * breathe, 1);
+    doll.hand.visible = wave > 0;
+    doll.hand.rotation.z = -0.5 + sn(t * 10) * 0.45;
+    const f = ch.face.v, lidClosed = lid < 0.5 || f.eyeOpen < 0.4;
+    doll.drawFace({ closed: lidClosed ? 1 : 0, happy: f.happy, angry: f.angry, mouth: f.mouthOpen, tears: f.tears }, t);
+    dollAnger.scale.setScalar(Math.max(0.001, f.angry * (0.3 + sn(t * 12) * 0.04)));
+    doll.bunny.position.copy(pal.position);
+    doll.bunny.position.y += 0.1;
+    doll.bunny.rotation.y = doll.root.rotation.y;
+    doll.bunny.rotation.z = sn(t * 1.7) * 0.1 + (action === 'angry' ? sn(t * 30) * 0.04 : 0);
+  }
 
   // --- Camera + ánh sáng đi theo nhân vật
   camera.position.add(prev.sub(state.pos).negate());
