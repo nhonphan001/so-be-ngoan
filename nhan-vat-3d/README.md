@@ -4,8 +4,7 @@ Webapp dựng nhân vật 3D từ bức tranh bút bi "Queen of White" (cô bé 
 
 ## Ba kiểu hiển thị
 
-- `src/doll.js` – con rối giấy từ các lớp cắt của bản vẽ gốc
-- `src/main.js`**Nét vẽ gốc** (mặc định): nhân vật là hình cắt giấy từ chính nét vẽ tay (3 lớp thân, đầu, thú bông trong `assets/`), biểu cảm được vẽ đè bằng nét mực.
+- **Nét vẽ gốc** (mặc định): nhân vật là hình cắt giấy từ chính nét vẽ tay (3 lớp thân, đầu, thú bông trong `assets/`), biểu cảm được vẽ đè bằng nét mực.
 - **3D bút bi**: mô hình 3D hiển thị bằng nét gạch mực xanh trên giấy.
 - **3D tô màu**: mô hình 3D tô màu.
 
@@ -42,5 +41,6 @@ Hoặc bật GitHub Pages cho repo rồi mở `/nhan-vat-3d/`.
 
 - `src/character.js` – dựng mô hình nhân vật và thú bông bằng khối hình cơ bản (three.js)
 - `src/face.js` – khuôn mặt vẽ bằng canvas (mắt, miệng, má hồng, nước mắt)
+- `src/doll.js` – con rối giấy từ các lớp cắt của bản vẽ gốc
 - `src/main.js` – cảnh, điều khiển, máy trạng thái chuyển động
 - `vendor/` – three.js r170 (giấy phép MIT)
